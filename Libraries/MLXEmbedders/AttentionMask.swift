@@ -14,7 +14,7 @@ import MLX
 ///
 /// - Precondition: `length > 0`, `halfWindow >= 0` when given, and `paddingMask`
 ///   has shape `[batch, length]`.
-public func createBidirectionalAttentionMask(
+func createBidirectionalAttentionMask(
     length: Int,
     halfWindow: Int?,
     paddingMask: MLXArray?
