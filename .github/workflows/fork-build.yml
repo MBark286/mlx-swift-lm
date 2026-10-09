@@ -1,0 +1,63 @@
+# Build check for a branch of MBark286/mlx-swift-lm on a GitHub-hosted macOS runner.
+# It only builds (library and test targets); it runs no tests, because hosted runners have no usable GPU for MLX.
+# The file lives only on the fork's ci/fork branch, so it never reaches main, the feature branches
+# or a PR to ml-explore/mlx-swift-lm. See fork-ci.md for how ci/fork gets dispatched.
+name: Fork build
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch of this fork to build
+        required: true
+        type: string
+
+run-name: Build ${{ inputs.branch }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-build-${{ inputs.branch }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Standard arm64 runner (3 cores, 7 GB): free for public repositories.
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      # Xcode 26.6 (Swift 6.3): mlx-swift 0.32 needs swift-tools 6.3, so Xcode 26.4 or newer.
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Toolchain
+        run: |
+          git rev-parse HEAD
+          xcodebuild -version
+          swift --version
+          case "$(xcodebuild -version | head -1)" in
+            "Xcode 26."[4-9]* | "Xcode 26."[1-9][0-9]* | "Xcode 2"[7-9]*) ;;
+            *) echo "::error::Need Xcode 26.4 or newer (Swift 6.3)."; exit 1 ;;
+          esac
+
+      # The image installs the Metal toolchain, but runner-images #13014 and #14013 report runs where it is
+      # missing. -showComponent exits 0 even when it is absent, so read its Status line and probe the compiler.
+      - name: Metal toolchain
+        run: |
+          status() { xcodebuild -showComponent MetalToolchain 2>&1 | awk -F': *' '/^Status:/ { print tolower($2); exit }'; }
+          if [ "$(status)" != "installed" ] || ! xcrun metal -v > /dev/null 2>&1; then
+            echo "Metal toolchain: '$(status)', downloading."
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          echo "Metal toolchain: $(status)"
+          xcrun metal -v
+
+      - name: Build (Xcode, macOS)
+        run: |
+          xcodebuild build-for-testing -skipPackagePluginValidation -skipMacroValidation \
+            -scheme mlx-swift-lm-Package -destination 'platform=macOS'
