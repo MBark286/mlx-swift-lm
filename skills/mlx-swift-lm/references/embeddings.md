@@ -319,6 +319,7 @@ EmbedderRegistry.shared.register(configurations: [myConfig])
 | BERT | `bert` |
 | Nomic BERT | `nomic_bert` |
 | Qwen3 | `qwen3` |
+| ModernBERT | `modernbert` |
 
 ## Memory Considerations
 
