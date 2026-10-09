@@ -43,6 +43,8 @@ public enum EmbedderTypeRegistry {
         "gemma3": create(Gemma3Configuration.self) { EmbeddingGemma($0) },
         "gemma3_text": create(Gemma3Configuration.self) { EmbeddingGemma($0) },
         "gemma3n": create(Gemma3Configuration.self) { EmbeddingGemma($0) },
+
+        "modernbert": create(ModernBertConfiguration.self) { ModernBertModel($0) },
     ])
 
 }

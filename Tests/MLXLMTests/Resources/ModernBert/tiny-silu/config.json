@@ -1,0 +1,31 @@
+{
+  "model_type": "modernbert",
+  "vocab_size": 64,
+  "hidden_size": 16,
+  "intermediate_size": 32,
+  "num_hidden_layers": 4,
+  "num_attention_heads": 2,
+  "max_position_embeddings": 64,
+  "local_attention": 8,
+  "global_attn_every_n_layers": 3,
+  "norm_eps": 1e-05,
+  "norm_bias": false,
+  "attention_bias": false,
+  "mlp_bias": false,
+  "pad_token_id": 0,
+  "bos_token_id": 1,
+  "cls_token_id": 1,
+  "eos_token_id": 2,
+  "sep_token_id": 2,
+  "classifier_pooling": "cls",
+  "embedding_dropout": 0.0,
+  "attention_dropout": 0.0,
+  "mlp_dropout": 0.0,
+  "initializer_range": 0.02,
+  "hidden_activation": "silu",
+  "global_rope_theta": 150000.0,
+  "local_rope_theta": 160000.0,
+  "architectures": [
+    "ModernBertModel"
+  ]
+}

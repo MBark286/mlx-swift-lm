@@ -1,4 +1,5 @@
-The two includes resources are for testing the MediaProcessing pipeline for correctness and validation
+The two `.mov` resources are for testing the MediaProcessing pipeline for correctness and validation.
+`Resources/ModernBert` holds the ModernBERT parity fixtures (see the end of this file).
 
 The video file was created via FFMPEG via
 
@@ -36,3 +37,17 @@ ffmpeg \
 -write_tmcd true \
 -y audio_only.mov
 ```
+
+## ModernBERT fixtures
+
+`Resources/ModernBert/tiny-silu` and `Resources/ModernBert/tiny-gelu` are two tiny ModernBERT
+checkpoints with random weights (4 layers, hidden size 16, 2 heads, `local_attention` 8) and the
+states transformers 5.17.0 computes for them, in `expected.safetensors`: the embedding output, every
+layer, the final hidden states and the normalized CLS vector, for a 24-token input, a 5-token input
+and a right-padded batch of two. The reference ran in float32 on the CPU with eager attention
+(torch 2.14.0).
+
+- `tiny-silu` uses the key layout and the transformers 4 `config.json` keys of
+  `ibm-granite/granite-embedding-97m-multilingual-r2`.
+- `tiny-gelu` is saved as `ModernBertForMaskedLM` (keys under `model.` plus the masked-LM head), with
+  the `config.json` that transformers 5 writes, like `answerdotai/ModernBERT-base`.
