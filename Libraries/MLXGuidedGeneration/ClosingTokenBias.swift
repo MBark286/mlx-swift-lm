@@ -12,10 +12,9 @@ public enum ClosingTokenBias {
     private static let tier1Bias: Float = 200.0
     private static let tier2Bias: Float = 100.0
 
-    private static let tier2Characters: Set<String> = [
-        "\"", "}", "]",
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    ]
+    /// Digits are not closers: the generation loop lets a digit through only
+    /// when the model picks it, so a number can finish but a digit run cannot start.
+    private static let tier2Characters: Set<String> = ["\"", "}", "]"]
 
     // MARK: - Public API
 
@@ -23,7 +22,7 @@ public enum ClosingTokenBias {
     /// positive value (tiered by priority), all others get 0.0.
     ///
     /// Tier 1 (+200): EOS token
-    /// Tier 2 (+100): `"`, `}`, `]`, single digits `0`-`9`
+    /// Tier 2 (+100): `"`, `}`, `]`
     public static func compute(tokenizer: any Tokenizer, eosTokenId: Int?) -> MLXArray {
         // Discover vocab size by scanning token IDs
         var vocabSize = 0

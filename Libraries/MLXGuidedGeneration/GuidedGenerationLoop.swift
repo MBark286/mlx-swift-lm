@@ -22,6 +22,9 @@ public enum GuidedGenerationLoop {
 
     private static let logger = MLXLogger(label: "GuidedGenerationLoop")
 
+    /// Longest run of digits the closing zones let through when the model picks them.
+    static let maxZoneDigitRun = 20
+
     /// Result of a single generation step.
     enum StepResult {
         /// A sampled token (normal generation).
@@ -152,6 +155,13 @@ public enum GuidedGenerationLoop {
         var consumerStopped = false
         var whitespaceTracker = WhitespaceRunTracker(whitespaceTokenIDs: whitespaceTokenIDs)
 
+        // Single-digit tokens, for the digit rule of the closing zones.
+        let digitTokenIDs: Set<Int> =
+            closingBias == nil
+            ? []
+            : Set((0 ... 9).compactMap { context.tokenizer.convertTokenToId(String($0)) })
+        var digitRun = 0
+
         // Pre-compute bias arrays used in the zone policy.
         //
         // eosPenalty: -10000 at each EOS/stop position. Used in the normal
@@ -241,11 +251,14 @@ public enum GuidedGenerationLoop {
             //
             //   Hard zone (hardReserve tokens left):
             //     Penalize all non-closing tokens (-10000) AND EOS (-10000).
-            //     Forces the model to select closing tokens (}, ], ", digits)
+            //     Forces the model to select closing tokens (}, ], ")
             //     that build up JSON structure. The grammar reaches a natural
             //     stop state when JSON is complete. EOS is penalized because
             //     the grammar may allow it at intermediate valid states before
             //     all required fields are present.
+            //
+            //   In both zones a digit the model picks itself passes without the
+            //   bias, up to maxZoneDigitRun in a row, so a number in progress ends.
             //
             // Only applied when the grammar's mask carries exclusions
             // (`needsApply == true`). When false, the grammar is in an
@@ -253,6 +266,8 @@ public enum GuidedGenerationLoop {
             // bias without a grammar mask can cause EOS selection before
             // the grammar has accepted the output.
             var activeBias: MLXArray? = nil
+            var naturalBias: MLXArray? = nil
+            var inClosingZone = false
             if mask.needsApply {
                 if let bias = closingBias {
                     if hardReserve > 0 && tokenCount >= maxTokens - hardReserve {
@@ -262,23 +277,37 @@ public enum GuidedGenerationLoop {
                             hardBias = hardBias + eosPenalty
                         }
                         activeBias = hardBias
+                        inClosingZone = true
                     } else if tokenCount >= maxTokens - completionReserve {
                         // Soft zone: nudge toward closing tokens, no EOS penalty.
                         activeBias = bias
+                        inClosingZone = true
                     }
                     // Normal zone: no bias. Grammar mask + natural EOS handle
                     // termination. Intentionally leaves `activeBias == nil`.
                 }
                 if let wsBias = whitespaceBias, whitespaceTracker.isActive {
                     activeBias = activeBias.map { $0 + wsBias } ?? wsBias
+                    naturalBias = wsBias
                 }
             }
-            let token = applyMaskAndSample(
-                logits: logits,
-                maskArray: maskArray,
-                closingBias: activeBias
-            )
+            var token: UInt32
+            if inClosingZone && digitRun < maxZoneDigitRun && !digitTokenIDs.isEmpty {
+                token = applyMaskAndSample(
+                    logits: logits, maskArray: maskArray, closingBias: naturalBias)
+                if !digitTokenIDs.contains(Int(token)) {
+                    token = applyMaskAndSample(
+                        logits: logits, maskArray: maskArray, closingBias: activeBias)
+                }
+            } else {
+                token = applyMaskAndSample(
+                    logits: logits,
+                    maskArray: maskArray,
+                    closingBias: activeBias
+                )
+            }
             let tokenId = Int(token)
+            digitRun = digitTokenIDs.contains(tokenId) ? digitRun + 1 : 0
 
             // Track the sampled token for whitespace run detection.
             // Fast-forward tokens are NOT tracked (they are grammar-forced).
@@ -354,6 +383,7 @@ public enum GuidedGenerationLoop {
             let ffTokens: [Int32] = commitResult.tokens
 
             if !ffTokens.isEmpty {
+                digitRun = 0
                 // Yield FF tokens to output. The caller's `emit`
                 // stop signal (`emit(text) == false`) must halt
                 // generation immediately, just like on the sampled-
