@@ -39,7 +39,7 @@ private struct ListTokenizer: MLXLMCommon.Tokenizer {
 @Suite
 struct ClosingTokenBiasTests {
 
-    @Test("Tier-2 closing characters get +100 bias")
+    @Test("Tier-2 closing characters get +100 bias; digits get none")
     func tier2CharactersGetHundredBias() {
         let tok = ListTokenizer(tokens: [
             "\"",  // 0
@@ -56,9 +56,11 @@ struct ClosingTokenBiasTests {
         #expect(values[0] == 100.0)  // "
         #expect(values[1] == 100.0)  // }
         #expect(values[2] == 100.0)  // ]
-        #expect(values[3] == 100.0)  // 0
-        #expect(values[4] == 100.0)  // 5
-        #expect(values[5] == 100.0)  // 9
+        // Digits never close a string or a number: biasing them lets the
+        // model write digits until maxTokens.
+        #expect(values[3] == 0.0)  // 0
+        #expect(values[4] == 0.0)  // 5
+        #expect(values[5] == 0.0)  // 9
         #expect(values[6] == 0.0)  // abc
     }
 
